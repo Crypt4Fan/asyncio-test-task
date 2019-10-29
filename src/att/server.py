@@ -68,10 +68,9 @@ def validate_ip_port(ctx, param, value):
         raise click.BadParameter('port not an integer')
     except IndexError:
         raise click.BadParameter('port number not specified')
-    if 1 <= port <= 65535:
-        return {'host': str(ip), 'port': port}
-    else:
+    if not 1 <= port <= 65535:
         raise click.BadParameter('port not in 1-65535 range')
+    return {'host': str(ip), 'port': port}
 
 @click.command()
 @click.option('--db-url')
