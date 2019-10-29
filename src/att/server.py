@@ -1,3 +1,4 @@
+import ipaddress
 import click
 import aiopg.sa
 import sqlalchemy as sa
@@ -56,9 +57,26 @@ async def close_db(app):
     await engine.wait_closed()
 
 
+def validate_ip_port(ctx, param, value):
+    try:
+        ip = ipaddress.ip_address(value.split(':')[0])
+    except ValueError:
+        raise click.BadParameter('invalid IP address')
+    try:
+        port = int(value.split(':')[1])
+    except ValueError:
+        raise click.BadParameter('port not an integer')
+    except IndexError:
+        raise click.BadParameter('port number not specified')
+    if 1 <= port <= 65535:
+        return {'host': str(ip), 'port': port}
+    else:
+        raise click.BadParameter('port not in 1-65535 range')
+
 @click.command()
 @click.option('--db-url')
-def main(db_url):
+@click.option('--listen', default='127.0.0.1:8000', callback=validate_ip_port, help='interface:port for listening')
+def main(db_url, listen):
     app = web.Application()
     app['db_url'] = db_url
     app.on_startup.append(setup_db)
@@ -69,4 +87,4 @@ def main(db_url):
         web.get('/user/{id}/groups', user_groups),
     ])
 
-    web.run_app(app, host='localhost', port=8000)
+    web.run_app(app, **listen)
