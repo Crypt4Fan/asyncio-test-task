@@ -48,6 +48,7 @@ def main(db_url, listen):
     app.on_cleanup.append(close_db)
 
     app.add_routes([
+        web.post('/signup', hndl.signup),
         web.post('/login', hndl.login),
         web.get('/user/{id}/groups', hndl.user_groups),
     ])

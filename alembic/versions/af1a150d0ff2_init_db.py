@@ -39,3 +39,4 @@ def upgrade():
 
 def downgrade():
     op.drop_table('user', schema='core')
+    op.execute('DROP SCHEMA "core"')
