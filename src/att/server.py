@@ -51,6 +51,8 @@ def main(db_url, listen):
         web.post('/signup', hndl.signup),
         web.post('/login', hndl.login),
         web.get('/user/{id}/groups', hndl.user_groups),
+        web.post('/group', hndl.create_group),
+        web.post(r'/group/{id:\d+}', hndl.manage_group)
     ])
 
     web.run_app(app, **listen)
