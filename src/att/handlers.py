@@ -71,7 +71,7 @@ GET_GROUP_ID_BY_NAME = (
 
 async def get_group_id_by_name(name, conn):
     result = await conn.execute(
-        GET_GROUP_ID, name=name
+        GET_GROUP_ID_BY_NAME, name=name
     )
     return await result.scalar()
 
@@ -265,4 +265,21 @@ async def user_ws_handler(request):
 
 
 async def group_ws_handler(request):
-    pass
+    group = request.match_info.get('group')
+    user_id = request.headers.get('Authentication', '')
+
+    if not re.match(r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}', user_id):
+        return web.json_response({'error': 'incorrect user id'})
+
+    async with request.app['db'].acquire() as conn:
+        group_id = await get_group_id_by_name(group, conn)
+        if group_id == None:
+            return web.json_response({'error': 'group does not exist'}, status=404)
+        if await check_user_in_group(user_id, group_id, conn) == None:
+            return web.json_response({'error': 'user not in group'})
+
+    ws = web.WebSocketResponse()
+    await ws.prepare(request)
+    while True:
+        await ws.send_json({'msg': 'message for members of group {}'.format(group)})
+        await asyncio.sleep(2)
