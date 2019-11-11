@@ -50,9 +50,11 @@ def main(db_url, listen):
     app.add_routes([
         web.post('/signup', hndl.signup),
         web.post('/login', hndl.login),
-        web.get('/user/{id}/groups', hndl.user_groups),
+        web.get(r'/user/{id:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}}/groups', hndl.user_groups),
         web.post('/group', hndl.create_group),
-        web.post(r'/group/{id:\d+}', hndl.manage_group)
+        web.post(r'/group/{id:\d+}', hndl.manage_group),
+        web.get(r'/listen/{user_id:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}}', hndl.user_ws_handler),
+        web.get('/broadcast/{group}', hndl.group_ws_handler)
     ])
 
     web.run_app(app, **listen)

@@ -1,3 +1,4 @@
+import asyncio
 import re
 import sqlalchemy as sa
 from aiohttp import web
@@ -247,3 +248,21 @@ async def manage_group(request):
             msg = {'error': 'unknown type of operation'}
 
     return web.json_response(msg)
+
+
+async def user_ws_handler(request):
+    user_id = request.match_info.get('user_id')
+
+    async with request.app['db'].acquire() as conn:
+        if await exist_user(user_id, conn) == None:
+            return web.json_response({'error': 'user does not exist'}, status=404)
+
+    ws = web.WebSocketResponse()
+    await ws.prepare(request)
+    while True:
+        await ws.send_json({'msg': 'message for user {}'.format(user_id)})
+        await asyncio.sleep(2)
+
+
+async def group_ws_handler(request):
+    pass
