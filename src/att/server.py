@@ -17,6 +17,12 @@ async def close_db(app):
     await engine.wait_closed()
 
 
+async def close_websockets(app):
+    for ws in (i['websocket'] for i in app['websockets'].values()):
+        await ws.close()
+    app['websockets'].clear()
+
+
 def validate_ip_port(ctx, param, value):
     try:
         ip = ipaddress.ip_address(value.split(':')[0])
@@ -44,8 +50,10 @@ def validate_ip_port(ctx, param, value):
 def main(db_url, listen):
     app = web.Application()
     app['db_url'] = db_url
+    app['websockets'] = {}
     app.on_startup.append(setup_db)
     app.on_cleanup.append(close_db)
+    app.on_shutdown.append(close_websockets)
 
     app.add_routes([
         web.post('/signup', hndl.signup),

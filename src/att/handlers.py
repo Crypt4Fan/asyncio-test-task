@@ -103,6 +103,19 @@ DEL_USER_FROM_GROUP = (
     .where(t_user_group.c.group_id == sa.bindparam('group_id'))
 )
 
+LIST_USER_GROUPS = (
+    sa.select([t_group.c.name.label('group_name')]).select_from(
+        t_user.join(t_user_group.join(t_group))
+    )
+    .where(t_user.c.id == sa.bindparam('user_id'))
+)
+
+async def get_user_groups(user_id, conn):
+    result = await conn.execute(
+        LIST_USER_GROUPS, user_id=user_id
+    )
+    return await result.fetchall()
+
 
 async def check_signup_params(login, password, conn):
     if not type(login) is str:
@@ -161,11 +174,13 @@ async def login(request):
 
 async def user_groups(request):
     user_id = request.match_info.get('id', None)
-    groups = []
 
-    # fill the gap
+    async with request.app['db'].acquire() as conn:
+        if await exist_user(user_id, conn) == None:
+            return web.json_response({'error': 'user does not exist'}, status=404)
+        groups = await get_user_groups(user_id, conn)
 
-    return web.json_response({'groups': groups})
+    return web.json_response({'groups': [row['group_name'] for row in groups]})
 
 
 async def check_create_group_params(name, conn):
@@ -256,6 +271,7 @@ async def user_ws_handler(request):
     async with request.app['db'].acquire() as conn:
         if await exist_user(user_id, conn) == None:
             return web.json_response({'error': 'user does not exist'}, status=404)
+
 
     ws = web.WebSocketResponse()
     await ws.prepare(request)
