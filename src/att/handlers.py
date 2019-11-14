@@ -1,7 +1,8 @@
 import asyncio
 import re
+
 import sqlalchemy as sa
-from aiohttp import web
+from aiohttp import web, WSMsgType
 
 from att.db.schema import t_user, t_group, t_user_group
 
@@ -114,7 +115,7 @@ async def get_user_groups(user_id, conn):
     result = await conn.execute(
         LIST_USER_GROUPS, user_id=user_id
     )
-    return await result.fetchall()
+    return [row['group_name'] for row in await result.fetchall()]
 
 
 async def check_signup_params(login, password, conn):
@@ -180,7 +181,7 @@ async def user_groups(request):
             return web.json_response({'error': 'user does not exist'}, status=404)
         groups = await get_user_groups(user_id, conn)
 
-    return web.json_response({'groups': [row['group_name'] for row in groups]})
+    return web.json_response({'groups': groups})
 
 
 async def check_create_group_params(name, conn):
@@ -271,31 +272,30 @@ async def user_ws_handler(request):
     async with request.app['db'].acquire() as conn:
         if await exist_user(user_id, conn) == None:
             return web.json_response({'error': 'user does not exist'}, status=404)
-
+        groups = await get_user_groups(user_id, conn)
 
     ws = web.WebSocketResponse()
     await ws.prepare(request)
-    while True:
-        await ws.send_json({'msg': 'message for user {}'.format(user_id)})
-        await asyncio.sleep(2)
+    request.app['websockets'][user_id] = {'groups': groups, 'ws': ws}
+
+    async for msg in ws:
+        pass
+
+    del request.app['websockets'][user_id]
+
+    return ws
 
 
-async def group_ws_handler(request):
+async def broadcast_to_group(request):
     group = request.match_info.get('group')
-    user_id = request.headers.get('Authentication', '')
-
-    if not re.match(r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}', user_id):
-        return web.json_response({'error': 'incorrect user id'})
+    msg = await request.json()
 
     async with request.app['db'].acquire() as conn:
-        group_id = await get_group_id_by_name(group, conn)
-        if group_id == None:
+        if await get_group_id_by_name(group, conn) == None:
             return web.json_response({'error': 'group does not exist'}, status=404)
-        if await check_user_in_group(user_id, group_id, conn) == None:
-            return web.json_response({'error': 'user not in group'})
 
-    ws = web.WebSocketResponse()
-    await ws.prepare(request)
-    while True:
-        await ws.send_json({'msg': 'message for members of group {}'.format(group)})
-        await asyncio.sleep(2)
+    for user in request.app['websockets'].values():
+        if group in user['groups']:
+            await user['ws'].send_json(msg)
+
+    return web.json_response({'status': 'OK'})

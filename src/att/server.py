@@ -9,6 +9,7 @@ import att.handlers as hndl
 async def setup_db(app):
     engine = await aiopg.sa.create_engine(dsn=app['db_url'])
     app['db'] = engine
+    app['websockets'] = {}
 
 
 async def close_db(app):
@@ -18,7 +19,7 @@ async def close_db(app):
 
 
 async def close_websockets(app):
-    for ws in (i['websocket'] for i in app['websockets'].values()):
+    for ws in (user['ws'] for user in app['websockets'].values()):
         await ws.close()
     app['websockets'].clear()
 
@@ -62,7 +63,7 @@ def main(db_url, listen):
         web.post('/group', hndl.create_group),
         web.post(r'/group/{id:\d+}', hndl.manage_group),
         web.get(r'/listen/{user_id:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}}', hndl.user_ws_handler),
-        web.get('/broadcast/{group}', hndl.group_ws_handler)
+        web.post('/broadcast/{group}', hndl.broadcast_to_group)
     ])
 
     web.run_app(app, **listen)
